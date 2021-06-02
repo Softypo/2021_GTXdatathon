@@ -3,7 +3,7 @@ import pandas as pd
 from os import listdir
 
 # load csv and excel files from a folder and store them in a dictionary
-def loader(path=None):
+def loader(path=None, ext=False):
     """load csv and excel files from a folder and store them in a dictionary.
     
     parameters
@@ -14,10 +14,12 @@ def loader(path=None):
     try:
         files = {}
         for filename in listdir(path):
+            if ext==False: name = filename.rpartition('.')[0].replace(' ', '_')
+            else: name =filename.replace(' ', '_')
             if filename.endswith('.xlsx'):
-                files[filename.replace(' ', '_')] = pd.read_excel(path+'\\'+filename)
+                files[name] = pd.read_excel(path+'\\'+filename)
             elif filename.endswith('.csv'):
-                files[filename.replace(' ', '_')] = pd.read_csv(path+'\\'+filename)
+                files[name] = pd.read_csv(path+'\\'+filename)
         return files
     except Exception:
         print ('Exception: No files loaded for \\', path)
