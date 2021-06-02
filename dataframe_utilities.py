@@ -15,12 +15,12 @@ def loader(path=None):
         files = {}
         for filename in listdir(path):
             if filename.endswith('.xlsx'):
-                files[filename.replace(' ', '_')] = pd.read_excel(path+'\\'+filename, comment=filename)
+                files[filename.replace(' ', '_')] = pd.read_excel(path+'\\'+filename)
             elif filename.endswith('.csv'):
-                files[filename.replace(' ', '_')] = pd.read_csv(path+'\\'+filename, comment=filename)
+                files[filename.replace(' ', '_')] = pd.read_csv(path+'\\'+filename)
         return files
     except Exception:
-        print ('Exception: No files loaded')
+        print ('Exception: No files loaded for \\', path)
 
 
 # drop columns or rows with all unique values
@@ -154,6 +154,7 @@ def dropEqualColumns (df=None, inplace=False):
         print ('Exception: input is not a pandas dataframe nor a list/tuple containing them')
 
 def main ():
+    target_folder = loader('Data for Datathon')
     pass
 
 if __name__ == "__main__":
