@@ -1,10 +1,12 @@
 # some usefull pandas dataframe extra functions for data cleaning
 import pandas as pd
 import numpy as np
+import lasio
 from os import listdir
+from tqdm.notebook import tqdm
 
-# load csv and excel files from a folder and store them in a dictionary
-def loader(path=None, index_col=None, ext=False, output='dict'):
+# load csv and excel files from a folder and store them in a dictionary/list
+def loader_df(path=None, index_col=None, ext=False, output='dict'):
     """load csv and excel files from a folder and store them in a dictionary.
     
     parameters
@@ -17,17 +19,17 @@ def loader(path=None, index_col=None, ext=False, output='dict'):
     try:
         if output=='dict':
             files = {}
-            for filename in listdir(path):
+            for filename in tqdm(listdir(path)):
                 if ext==False: name = filename.rpartition('.')[0].replace(' ', '_')
                 else: name =filename.replace(' ', '_')
                 if filename.endswith('.xlsx'):
-                    files[name] = pd.read_excel(path+'\\'+filename, index_col=index_col,)
+                    files[name] = pd.read_excel(path+'\\'+filename, index_col=index_col)
                 elif filename.endswith('.csv'):
                     files[name] = pd.read_csv(path+'\\'+filename, index_col=index_col)
             return files
         elif output=='list':
             files = []
-            for filename in listdir(path):
+            for filename in tqdm(listdir(path)):
                 if ext==False: name = filename.rpartition('.')[0].replace(' ', '_')
                 else: name =filename.replace(' ', '_')
                 if filename.endswith('.xlsx'):
@@ -36,27 +38,40 @@ def loader(path=None, index_col=None, ext=False, output='dict'):
                     files.append([name, pd.read_excel(path+'\\'+filename, index_col=index_col)])
             return files
     except:
-        print ('No files loaded for \\', path)
+        print ('No files loaded for \\',path)
 
 
-# boost of original pd.merge funtion,
-def multiadd (dfs=None):
-    """takes al dataframes in a array like object and returns it's sum.
-
-    Parameters
+# load las files from a folder for lasio
+def loader_lasio(path=None, ext=False, output='dict'):
+    """load well logs las files from a folder and store them in a dictionary/list.
+    
+    parameters
     ----------
-    dfs : mutable array like containing DataFrames
-        Object to merge with.
+    path : folder path containg the desired las files.
+    ext: bol, include extention in file name
+    output: str, 'dict' or 'list'
     """
     #try:
-    if isinstance(dfs, dict): dfs = list(dfs.values())
-    if isinstance(dfs, (list, tuple)):
-        df = pd.DataFrame(index=dfs[0].index)
-        for d in dfs:
-            df = df+d
-        return df
+    if output=='dict':
+        lasio_files, las_df= {}, {}
+        for filename in tqdm(listdir(path)):
+            if ext==False: name = filename.rpartition('.')[0].replace(' ', '_')
+            else: name =filename.replace(' ', '_')
+            if filename.endswith(('.las', '.LAS')):
+                lasio_files[name] = lasio.read(path+'\\'+filename)
+                las_df[name] = lasio_files[name].df()
+        return lasio_files, las_df
+    elif output=='list':
+        lasio_files, las_df= [], []
+        for filename in tqdm(listdir(path)):
+            if ext==False: name = filename.rpartition('.')[0].replace(' ', '_')
+            else: name =filename.replace(' ', '_')
+            if filename.endswith(('.las', '.LAS')):
+                lasio_files.append([name, lasio.read(path+'\\'+filename)])
+                las_df.append([name, lasio_files[name].df()])
+        return lasio_files, las_df
     #except:
-    #    print ('Exception: input is not a dict/list/tuple containing them')
+        print ('No files loaded for \\',path)
 
 
 # boost of original pd.merge funtion,
@@ -292,9 +307,9 @@ def dropEqualColumns (df=None, inplace=False):
         print ('Exception: input is not a pandas dataframe nor a dict/list/tuple containing them')
 
 
-# drop equal value columns
+# drop equal value rows
 def dropEqualRows (df=None, keep='first', view=False):
-    """drop equal value columns.
+    """drop equal value rows.
     
     parameters
     ----------
