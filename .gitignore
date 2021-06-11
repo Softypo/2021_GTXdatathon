@@ -3,9 +3,12 @@
 /Data for Datathon
 /.vscode
 /__pycache__
+/_model_deep
 consolidated_well_data_Softypo.csv
 .gitignore
 consolidated_well_data_Softypo_m.csv
 consolidated_well_data_Softypo_ft.csv
 final_well_data_Softypo_ft.csv
 well_logs_Softypo.csv
+predictions.zip
+predictions.csv
