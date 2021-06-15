@@ -1,3 +1,4 @@
+/_Kfolds_models
 /.2021Datathon_venv
 /StructuredData
 /Data for Datathon
@@ -12,3 +13,7 @@ final_well_data_Softypo_ft.csv
 well_logs_Softypo.csv
 predictions.zip
 predictions.csv
+train_x.npy
+train_y.npy
+holdout_x.npy
+holdout_y.npy
