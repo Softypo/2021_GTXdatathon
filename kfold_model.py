@@ -5,14 +5,11 @@ import json
 import pickle
 from sklearn import metrics as skmetrics
 from tensorflow import function as tfunc
-from tensorflow.keras import callbacks
+from tensorflow.keras import callbacks, regularizers
 from tensorflow.keras.optimizers import schedules
-from tensorflow.keras.models import load_model
-from tensorflow.keras import regularizers
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model, clone_model
 from tensorflow.keras.layers import Dense, Dropout, LeakyReLU
 import tensorflow.keras.losses as klosses
-from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import KFold
 from os import listdir, remove
 from os.path import isfile, islink, isdir
@@ -27,7 +24,7 @@ def mapping_to_target_range(x, target_min=0, target_max=500):
     return  x02*scale+target_min
 
 # graph training result using mathplotlib
-def graph_training_mathplot(histories, tight_layout=False, holdout_scores=None):
+def graph_training_mathplot(histories, holdout_scores=None, tight_layout=False):
     fig, axs = plt.subplots(nrows=1, ncols=len(histories), figsize=(20, 5))
     n = 0
     for ax, kmodel in zip(axs, histories.items()):
@@ -138,7 +135,7 @@ def get_callbacks(monitor='val_loss', lr_patience=250, factor=0.1, min_lr=0.0000
             callbacks.EarlyStopping(monitor=monitor, min_delta=min_delta, patience=stop_patience, verbose=1, mode=mode, baseline=baseline, restore_best_weights=restore_best_weights)]
 
 # model builder
-def model_builder_kfolds(model, x, num_folds, random_state=42, shuffle=True):
+def model_builder_kfolds(model, y, num_folds, random_state=42, shuffle=True):
     #setting up model
     models = {}
     n = 0
@@ -151,7 +148,7 @@ def model_builder_kfolds(model, x, num_folds, random_state=42, shuffle=True):
     elif isinstance(model, object):
         try:
             for k in range(0, num_folds):
-                models[f'k{k+1}_model'] = model
+                models[f'k{k+1}_model'] = clone_model(model) # TODO: complete the model cloning feature, this method still needs to compile the model, need workarround or alternative method
                 n+=1
         except: print ('No model found for \\',model)
     #setting up ksets
@@ -162,7 +159,7 @@ def model_builder_kfolds(model, x, num_folds, random_state=42, shuffle=True):
         # storing ksets
         ksets = {}
         count = 1
-        for test, train in kfold.split(x):
+        for test, train in kfold.split(y):
             ksets['k{}'.format(count)] = {}
             ksets['k{}'.format(count)]['train'] = train.tolist()
             ksets['k{}'.format(count)]['test'] = test.tolist()
@@ -244,7 +241,7 @@ def model_kfolds(model, x, y, holdout=None, num_folds=5, shuffle=True, random_st
         # load histories
         histories = histories_loader_kfolds(path=f'{path}/histories.data')
     else:
-        models, ksets = model_builder_kfolds(model=model, x=x, num_folds=num_folds, random_state=random_state, shuffle=shuffle)
+        models, ksets = model_builder_kfolds(model=model, y=y, num_folds=num_folds, random_state=random_state, shuffle=shuffle)
         histories = {}
 
     # K-fold Cross Validation model evaluation
@@ -342,7 +339,7 @@ def main ():
     holdout_y = np.load('holdout_y.npy')
     
     # run kfolds models
-    models, histories, holdout_score = model_kfolds(model='.\.kerastunner\GTX_dataset_second_bayesian\second_step_bayesian_best_model.h5', x=train_x, y=train_y, holdout=[holdout_x,holdout_y], num_folds=5, shuffle=True, random_state=42, batch_size=None, steps_per_epoch=10, max_epochs=10000, ind_epochs=None, monitor='val_loss', lr_patience=250, factor=0.1, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=True, verbosity=1, workers=6, use_multiprocessing=True, continue_training=False, save_models_after_training=False, plot_results=True, plot_width=None, plot_height=None, path=None)
+    models, histories, holdout_score = model_kfolds(model='.\.kerastunner\GTX_dataset_second_bayesian\second_step_bayesian_best_model.h5', x=train_x, y=train_y, holdout=[holdout_x,holdout_y], num_folds=5, shuffle=True, random_state=42, batch_size=None, steps_per_epoch=10, max_epochs=10, ind_epochs=None, monitor='val_loss', lr_patience=250, factor=0.1, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=True, verbosity=1, workers=6, use_multiprocessing=True, continue_training=False, save_models_after_training=False, plot_results=True, plot_width=None, plot_height=None, path=None)
     
     # [600,100,200,175,250,69,575,450,400,600]
     # [300,100,200,175,250,69,575,165,127,600]
@@ -356,4 +353,3 @@ def main ():
 
 if __name__ == "__main__":
     main()
-
