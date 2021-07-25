@@ -14,8 +14,9 @@ from tensorflow.keras.layers import Dense, Dropout, LeakyReLU
 import tensorflow.keras.losses as klosses
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import KFold
-from os import listdir
-from os import path as ospath
+from os import listdir, remove
+from os.path import isfile, islink, isdir
+from shutil import rmtree
 from plotly.subplots import make_subplots
 
 # a simple custom activation
@@ -132,7 +133,7 @@ def graph_results_plotly(y, predictions, scores=None, width=None, height=None, t
     fig.show(renderer=renderer)
 
 # keras model callbacks
-def get_callbacks(monitor='val_loss', lr_patience=250, factor=0.2, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=False):
+def get_callbacks(monitor='val_loss', lr_patience=250, factor=0.1, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=False):
     return [callbacks.ReduceLROnPlateau(monitor=monitor, factor=factor, patience=lr_patience, min_lr=min_lr, verbose=1),
             callbacks.EarlyStopping(monitor=monitor, min_delta=min_delta, patience=stop_patience, verbose=1, mode=mode, baseline=baseline, restore_best_weights=restore_best_weights)]
 
@@ -169,29 +170,44 @@ def model_builder_kfolds(model, x, num_folds, random_state=42, shuffle=True):
     except: print ('error during ksets creation')
     return models, ksets
 
+def remove(path):
+    # param <path> could either be relative or absolute
+    if isfile(path) or islink(path):
+        remove(path)  # remove the file
+    elif isdir(path):
+        rmtree(path)  # remove dir and all contains
+    else:
+        raise ValueError(f'file {path} is not a file or dir.')
+
 # save models to disk
 def model_saver_kfolds(models, histories=None, ksets=None, path='_Kfolds_models', save_models_after_training=False):
     if save_models_after_training==True: val = 'Y'
     else: val = input("Save results (y/n): ")
     if val.startswith(('Y', 'y')):
-        for model_name, model in models.items():
-            # save models
-            model.save(f'./{path}/{model_name}.h5')
-        if histories!=None:
-            # save histories
-            with open(f'./{path}/histories.data', 'wb') as fp: pickle.dump(histories, fp)
-        if ksets!=None:
-            # dump ksets to json
-            with open(f'./{path}/ksets.json', 'w') as fp: json.dump(ksets, fp)
+        # remove previous saved files
+        remove(path)
+        # save new files
+        try:
+            for model_name, model in models.items():
+                # save models
+                model.save(f'./{path}/{model_name}.h5')
+            if histories!=None:
+                # save histories
+                with open(f'./{path}/histories.data', 'wb') as fp: pickle.dump(histories, fp)
+            if ksets!=None:
+                # dump ksets to json
+                with open(f'./{path}/ksets.json', 'w') as fp: json.dump(ksets, fp)
+        except Exception as e:
+            print ("Exception: %s." % (e))
 
 # loads models from disk
-def model_loader_kfolds(num_folds, path='_Kfolds_models'):
+def model_loader_kfolds(path='_Kfolds_models'):
     try:
         models = {}
         n = 0
         for filename in listdir(path):
             name = filename.rpartition('.')[0].replace(' ', '_')
-            if filename.endswith('.h5') and n<num_folds:
+            if filename.endswith('.h5'):
                 models[name] = load_model(path+'\\'+filename)
                 n+=1
         return models
@@ -222,7 +238,7 @@ def model_kfolds(model, x, y, holdout=None, num_folds=5, shuffle=True, random_st
     path = path if path!=None else '_Kfolds_models'
     if continue_training==True:
         # load models
-        models = model_loader_kfolds(num_folds=num_folds, path=path)
+        models = model_loader_kfolds(path=path)
         # load ksets oder
         ksets = ksets_loader_kfolds(path=f'{path}/ksets.json')
         # load histories
@@ -239,6 +255,7 @@ def model_kfolds(model, x, y, holdout=None, num_folds=5, shuffle=True, random_st
     holdout_scores =[]
     for k, kset in ksets.items():
         if ind_epochs[fold_no-1]!=None: epochs = ind_epochs[fold_no-1] if ind_epochs[fold_no-1]>=1 and ind_epochs[fold_no-1]<max_epochs else max_epochs
+        else: epochs = None
         model_key = str(f'{k}_model')
         train = kset['train']
         test = kset['test']
@@ -246,7 +263,7 @@ def model_kfolds(model, x, y, holdout=None, num_folds=5, shuffle=True, random_st
         print('------------------------------------------------------------------------')
         print(f'Training for fold {fold_no} ...')
         # running models
-        if ind_epochs[fold_no-1]!=None or continue_training!=False:
+        if epochs!=None:
             h[model_key] = models[model_key].fit(x[train], y[train],
                                                 batch_size = batch_size,
                                                 steps_per_epoch = steps_per_epoch,
@@ -325,12 +342,15 @@ def main ():
     holdout_y = np.load('holdout_y.npy')
     
     # run kfolds models
-    models, histories, holdout_score = model_kfolds(model='.\.kerastunner\GTX_dataset_second_bayesian\second_step_bayesian_best_model.h5', x=train_x, y=train_y, holdout=[holdout_x,holdout_y], num_folds=10, shuffle=True, random_state=42, batch_size=None, steps_per_epoch=10, max_epochs=5000, ind_epochs=None, monitor='val_loss', lr_patience=250, factor=0.2, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=False, verbosity=1, workers=6, use_multiprocessing=True, continue_training=False, save_models_after_training=True, plot_results=True, plot_width=None, plot_height=None, path=None)
+    models, histories, holdout_score = model_kfolds(model='.\.kerastunner\GTX_dataset_second_bayesian\second_step_bayesian_best_model.h5', x=train_x, y=train_y, holdout=[holdout_x,holdout_y], num_folds=5, shuffle=True, random_state=42, batch_size=None, steps_per_epoch=10, max_epochs=10000, ind_epochs=None, monitor='val_loss', lr_patience=250, factor=0.1, min_lr=0.000001, stop_patience=1000, min_delta=0, mode='auto', baseline=None, restore_best_weights=True, verbosity=1, workers=6, use_multiprocessing=True, continue_training=False, save_models_after_training=False, plot_results=True, plot_width=None, plot_height=None, path=None)
     
-    models = model_loader_kfolds(num_folds=10)
+    # [600,100,200,175,250,69,575,450,400,600]
+    # [300,100,200,175,250,69,575,165,127,600]
+
+    models = model_loader_kfolds()
 
     # run k folds predictions
-    yhat, yhat_score, predictions, scores = predict_kfolds(holdout_x, holdout_y, models, todrop=['k2_model'], output=None, plot_results=True, plot_width=None, plot_height=None)
+    yhat, yhat_score, predictions, scores = predict_kfolds(holdout_x, holdout_y, models, todrop=None, output=None, plot_results=True, plot_width=None, plot_height=None)
     
     pass
 
